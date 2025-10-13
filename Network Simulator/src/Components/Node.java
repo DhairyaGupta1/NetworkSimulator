@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Set;
 
 public class Node extends NetworkComponent{
-    static long serialVersionUID = 1l;  //UID common to all nodes, this ensures that all nodes have a distinct UID
+    public static long serialVersionUID = 1l;  //UID common to all nodes, this ensures that all nodes have a distinct UID
     public final long id;                     //UID of current node
     public Set<Node> neighbors;         //set of current nodes neighbors
     public int x;
