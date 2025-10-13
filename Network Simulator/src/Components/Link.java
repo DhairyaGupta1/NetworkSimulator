@@ -5,7 +5,7 @@ import java.util.HashSet;
 
 //denotes a link between two nodes
 public class Link extends NetworkComponent{
-    static long serialVersionUID = 1l;          //UID for Links
+    public static long serialVersionUID = 1l;          //UID for Links
     public Node node1;                          //node connected to one end of the link
     public Node node2;                          //node connected to opposite end of the link
     public final long id;
