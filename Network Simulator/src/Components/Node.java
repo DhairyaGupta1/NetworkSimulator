@@ -42,7 +42,6 @@ public class Node extends NetworkComponent {
     public static synchronized boolean reserveId(long id) {
         if (id <= 0)
             return false;
-        // If id is available in freeIds, remove it and reserve
         if (freeIds.remove(id))
             return true;
         if (serialVersionUID <= id) {
