@@ -3,6 +3,7 @@ package Exporters;
 import Components.Link;
 import Components.Node;
 import UI.SimulationConfigDialog.SimulationConfig;
+import UI.RoutingConfigDialog.TrafficFlow;
 
 import java.io.*;
 import java.util.*;
@@ -10,7 +11,7 @@ import java.util.*;
 public class NS2TclGenerator {
 
     public static void generateTcl(File outFile, Collection<Node> nodes, Collection<Link> links,
-            SimulationConfig config) throws IOException {
+            SimulationConfig config, List<TrafficFlow> flows) throws IOException {
 
         Map<Long, String> nodeVar = new HashMap<>();
 
@@ -47,6 +48,19 @@ public class NS2TclGenerator {
             }
             out.println();
 
+            if (config.enableNam) {
+                out.println("# Set node positions for NAM visualization (using actual canvas positions)");
+                for (Node n : nodes) {
+                    String var = "n" + n.id;
+                    // Use actual canvas coordinates - NAM will scale them appropriately
+                    out.println("$" + var + " set X_ " + n.x);
+                    out.println("$" + var + " set Y_ " + n.y);
+                    out.println("$" + var + " set Z_ 0");
+                    out.println("$" + var + " label \"Node " + n.id + "\"");
+                }
+                out.println();
+            }
+
             out.println("# Create links");
             for (Link l : links) {
                 String v1 = nodeVar.get(l.node1.id);
@@ -60,78 +74,37 @@ public class NS2TclGenerator {
             }
             out.println();
 
-            List<Node> nodeList = new ArrayList<>(nodes);
-            if (nodeList.size() >= 2) {
-                out.println("# Setup traffic between nodes");
+            // Setup traffic flows
+            if (flows != null && !flows.isEmpty()) {
+                out.println("# Setup custom traffic flows");
+                int flowIdx = 0;
+                for (TrafficFlow flow : flows) {
+                    String srcVar = "n" + flow.srcNodeId;
+                    String dstVar = "n" + flow.dstNodeId;
 
-                Node src = nodeList.get(0);
-                Node dst = nodeList.get(nodeList.size() - 1);
-                String srcVar = nodeVar.get(src.id);
-                String dstVar = nodeVar.get(dst.id);
-
-                if (config.protocol.startsWith("TCP")) {
-                    String tcpVariant = config.protocol.contains("/")
-                            ? config.protocol.substring(config.protocol.indexOf("/") + 1)
-                            : "Reno";
-
-                    out.println("# Create TCP agent");
-                    out.println("set tcp [new Agent/TCP/" + tcpVariant + "]");
-                    out.println("$ns attach-agent $" + srcVar + " $tcp");
-                    out.println("$tcp set packetSize_ " + config.packetSize);
-                    out.println();
-
-                    out.println("# Create TCP sink");
-                    out.println("set sink [new Agent/TCPSink]");
-                    out.println("$ns attach-agent $" + dstVar + " $sink");
-                    out.println("$ns connect $tcp $sink");
-                    out.println();
-
-                    if (config.application.equals("FTP")) {
-                        out.println("# Create FTP application");
-                        out.println("set ftp [new Application/FTP]");
-                        out.println("$ftp attach-agent $tcp");
-                        out.println("$ns at 0.5 \"$ftp start\"");
-                        out.println("$ns at " + (config.simTime - 0.5) + " \"$ftp stop\"");
-                    } else if (config.application.equals("Telnet")) {
-                        out.println("# Create Telnet application");
-                        out.println("set telnet [new Application/Telnet]");
-                        out.println("$telnet attach-agent $tcp");
-                        out.println("$ns at 0.5 \"$telnet start\"");
-                        out.println("$ns at " + (config.simTime - 0.5) + " \"$telnet stop\"");
+                    if (!nodeVar.containsKey(flow.srcNodeId) || !nodeVar.containsKey(flow.dstNodeId)) {
+                        out.println("# Skipping flow (invalid nodes)");
+                        continue;
                     }
 
-                } else if (config.protocol.equals("UDP")) {
-                    out.println("# Create UDP agent");
-                    out.println("set udp [new Agent/UDP]");
-                    out.println("$ns attach-agent $" + srcVar + " $udp");
-                    out.println();
-
-                    out.println("# Create Null agent (UDP sink)");
-                    out.println("set null [new Agent/Null]");
-                    out.println("$ns attach-agent $" + dstVar + " $null");
-                    out.println("$ns connect $udp $null");
-                    out.println();
-
-                    if (config.application.equals("CBR")) {
-                        out.println("# Create CBR traffic");
-                        out.println("set cbr [new Application/Traffic/CBR]");
-                        out.println("$cbr attach-agent $udp");
-                        out.println("$cbr set packetSize_ " + config.packetSize);
-                        out.println("$cbr set rate_ " + config.dataRate);
-                        out.println("$ns at 0.5 \"$cbr start\"");
-                        out.println("$ns at " + (config.simTime - 0.5) + " \"$cbr stop\"");
-                    } else if (config.application.equals("Exponential")) {
-                        out.println("# Create Exponential traffic");
-                        out.println("set exp [new Application/Traffic/Exponential]");
-                        out.println("$exp attach-agent $udp");
-                        out.println("$exp set packetSize_ " + config.packetSize);
-                        out.println("$exp set rate_ " + config.dataRate);
-                        out.println("$ns at 0.5 \"$exp start\"");
-                        out.println("$ns at " + (config.simTime - 0.5) + " \"$exp stop\"");
-                    }
+                    setupTrafficFlow(out, srcVar, dstVar, flow.flowType, flow.startTime,
+                            flow.stopTime, config, flowIdx);
+                    flowIdx++;
                 }
-                out.println();
+            } else {
+                // Default: Setup traffic between first and last nodes
+                List<Node> nodeList = new ArrayList<>(nodes);
+                if (nodeList.size() >= 2) {
+                    out.println("# Setup default traffic between first and last nodes");
+                    Node src = nodeList.get(0);
+                    Node dst = nodeList.get(nodeList.size() - 1);
+                    String srcVar = nodeVar.get(src.id);
+                    String dstVar = nodeVar.get(dst.id);
+
+                    setupDefaultTraffic(out, srcVar, dstVar, config);
+                }
             }
+            out.println();
 
             out.println("# Define finish procedure");
             out.println("proc finish {} {");
@@ -160,5 +133,151 @@ public class NS2TclGenerator {
             out.println("# Run simulation");
             out.println("$ns run");
         }
+    }
+
+    private static void setupDefaultTraffic(PrintStream out, String srcVar, String dstVar, SimulationConfig config) {
+        if (config.protocol.startsWith("TCP")) {
+            String tcpVariant = config.protocol.contains("/")
+                    ? config.protocol.substring(config.protocol.indexOf("/") + 1)
+                    : "Reno";
+
+            out.println("# Create TCP agent");
+            out.println("set tcp [new Agent/TCP/" + tcpVariant + "]");
+            out.println("$ns attach-agent $" + srcVar + " $tcp");
+            out.println("$tcp set packetSize_ " + config.packetSize);
+            out.println();
+
+            out.println("# Create TCP sink");
+            out.println("set sink [new Agent/TCPSink]");
+            out.println("$ns attach-agent $" + dstVar + " $sink");
+            out.println("$ns connect $tcp $sink");
+            out.println();
+
+            if (config.application.equals("FTP")) {
+                out.println("# Create FTP application");
+                out.println("set ftp [new Application/FTP]");
+                out.println("$ftp attach-agent $tcp");
+                out.println("$ns at 0.5 \"$ftp start\"");
+                out.println("$ns at " + (config.simTime - 0.5) + " \"$ftp stop\"");
+            } else if (config.application.equals("Telnet")) {
+                out.println("# Create Telnet application");
+                out.println("set telnet [new Application/Telnet]");
+                out.println("$telnet attach-agent $tcp");
+                out.println("$ns at 0.5 \"$telnet start\"");
+                out.println("$ns at " + (config.simTime - 0.5) + " \"$telnet stop\"");
+            }
+
+        } else if (config.protocol.equals("UDP")) {
+            out.println("# Create UDP agent");
+            out.println("set udp [new Agent/UDP]");
+            out.println("$ns attach-agent $" + srcVar + " $udp");
+            out.println();
+
+            out.println("# Create Null agent (UDP sink)");
+            out.println("set null [new Agent/Null]");
+            out.println("$ns attach-agent $" + dstVar + " $null");
+            out.println("$ns connect $udp $null");
+            out.println();
+
+            if (config.application.equals("CBR")) {
+                out.println("# Create CBR traffic");
+                out.println("set cbr [new Application/Traffic/CBR]");
+                out.println("$cbr attach-agent $udp");
+                out.println("$cbr set packetSize_ " + config.packetSize);
+                out.println("$cbr set rate_ " + config.dataRate);
+                out.println("$ns at 0.5 \"$cbr start\"");
+                out.println("$ns at " + (config.simTime - 0.5) + " \"$cbr stop\"");
+            } else if (config.application.equals("Exponential")) {
+                out.println("# Create Exponential traffic");
+                out.println("set exp [new Application/Traffic/Exponential]");
+                out.println("$exp attach-agent $udp");
+                out.println("$exp set packetSize_ " + config.packetSize);
+                out.println("$exp set rate_ " + config.dataRate);
+                out.println("$ns at 0.5 \"$exp start\"");
+                out.println("$ns at " + (config.simTime - 0.5) + " \"$exp stop\"");
+            }
+        }
+    }
+
+    private static void setupTrafficFlow(PrintStream out, String srcVar, String dstVar,
+            String flowType, double startTime, double stopTime, SimulationConfig config, int flowIdx) {
+
+        String agentVar = "agent" + flowIdx;
+        String sinkVar = "sink" + flowIdx;
+        String appVar = "app" + flowIdx;
+
+        if (flowType.startsWith("TCP")) {
+            String tcpVariant = "Reno";
+            String appType = "FTP";
+
+            if (flowType.contains("/")) {
+                String[] parts = flowType.split("/");
+                if (parts.length > 1) {
+                    appType = parts[1];
+                    if (parts.length > 2) {
+                        tcpVariant = parts[2];
+                    }
+                }
+            }
+
+            out.println("# Flow " + flowIdx + ": TCP " + appType + " from $" + srcVar + " to $" + dstVar);
+            out.println("set " + agentVar + " [new Agent/TCP/" + tcpVariant + "]");
+            out.println("$ns attach-agent $" + srcVar + " $" + agentVar);
+            out.println("$" + agentVar + " set packetSize_ " + config.packetSize);
+            out.println();
+
+            out.println("set " + sinkVar + " [new Agent/TCPSink]");
+            out.println("$ns attach-agent $" + dstVar + " $" + sinkVar);
+            out.println("$ns connect $" + agentVar + " $" + sinkVar);
+            out.println();
+
+            if (appType.equals("FTP")) {
+                out.println("set " + appVar + " [new Application/FTP]");
+                out.println("$" + appVar + " attach-agent $" + agentVar);
+                out.println("$ns at " + startTime + " \"$" + appVar + " start\"");
+                out.println("$ns at " + stopTime + " \"$" + appVar + " stop\"");
+            } else if (appType.equals("Telnet")) {
+                out.println("set " + appVar + " [new Application/Telnet]");
+                out.println("$" + appVar + " attach-agent $" + agentVar);
+                out.println("$ns at " + startTime + " \"$" + appVar + " start\"");
+                out.println("$ns at " + stopTime + " \"$" + appVar + " stop\"");
+            }
+
+        } else if (flowType.startsWith("UDP")) {
+            String appType = "CBR";
+            if (flowType.contains("/")) {
+                String[] parts = flowType.split("/");
+                if (parts.length > 1) {
+                    appType = parts[1];
+                }
+            }
+
+            out.println("# Flow " + flowIdx + ": UDP " + appType + " from $" + srcVar + " to $" + dstVar);
+            out.println("set " + agentVar + " [new Agent/UDP]");
+            out.println("$ns attach-agent $" + srcVar + " $" + agentVar);
+            out.println();
+
+            out.println("set " + sinkVar + " [new Agent/Null]");
+            out.println("$ns attach-agent $" + dstVar + " $" + sinkVar);
+            out.println("$ns connect $" + agentVar + " $" + sinkVar);
+            out.println();
+
+            if (appType.equals("CBR")) {
+                out.println("set " + appVar + " [new Application/Traffic/CBR]");
+                out.println("$" + appVar + " attach-agent $" + agentVar);
+                out.println("$" + appVar + " set packetSize_ " + config.packetSize);
+                out.println("$" + appVar + " set rate_ " + config.dataRate);
+                out.println("$ns at " + startTime + " \"$" + appVar + " start\"");
+                out.println("$ns at " + stopTime + " \"$" + appVar + " stop\"");
+            } else if (appType.equals("Exponential")) {
+                out.println("set " + appVar + " [new Application/Traffic/Exponential]");
+                out.println("$" + appVar + " attach-agent $" + agentVar);
+                out.println("$" + appVar + " set packetSize_ " + config.packetSize);
+                out.println("$" + appVar + " set rate_ " + config.dataRate);
+                out.println("$ns at " + startTime + " \"$" + appVar + " start\"");
+                out.println("$ns at " + stopTime + " \"$" + appVar + " stop\"");
+            }
+        }
+        out.println();
     }
 }

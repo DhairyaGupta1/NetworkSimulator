@@ -99,14 +99,25 @@ public class NetworkEditor extends JFrame {
             return;
         }
 
-        SimulationConfigDialog dialog = new SimulationConfigDialog(this);
-        dialog.setVisible(true);
+        // Step 1: Configure simulation parameters
+        SimulationConfigDialog configDialog = new SimulationConfigDialog(this);
+        configDialog.setVisible(true);
 
-        if (!dialog.isConfirmed()) {
+        if (!configDialog.isConfirmed()) {
             return;
         }
 
-        SimulationConfig config = dialog.getConfig();
+        SimulationConfig config = configDialog.getConfig();
+
+        // Step 2: Configure packet flows (routing)
+        RoutingConfigDialog routingDialog = new RoutingConfigDialog(this, canvas.getNodes());
+        routingDialog.setVisible(true);
+
+        if (!routingDialog.isConfirmed()) {
+            return;
+        }
+
+        java.util.List<RoutingConfigDialog.TrafficFlow> flows = routingDialog.getFlows();
 
         JDialog progressDialog = new JDialog(this, "Running Simulation", true);
         progressDialog.setLayout(new BorderLayout(10, 10));
@@ -123,9 +134,9 @@ public class NetworkEditor extends JFrame {
 
             @Override
             protected NS3ApiClient.SimulationResult doInBackground() throws Exception {
-                publish("Generating NS-2 TCL script...");
+                publish("Generating NS-2 TCL script with custom flows...");
                 File tempTcl = File.createTempFile("network_sim_", ".tcl");
-                NS2TclGenerator.generateTcl(tempTcl, canvas.getNodes(), canvas.getLinks(), config);
+                NS2TclGenerator.generateTcl(tempTcl, canvas.getNodes(), canvas.getLinks(), config, flows);
 
                 publish("Uploading to NS-3 API...");
                 NS3ApiClient.SimulationResult result = NS3ApiClient.runSimulation(tempTcl);
