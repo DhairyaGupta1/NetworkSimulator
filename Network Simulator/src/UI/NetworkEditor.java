@@ -2,11 +2,16 @@ package UI;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.File;
 import Exporters.ItmTclFrame;
+import Exporters.NS2TclGenerator;
+import Exporters.NS3ApiClient;
+import UI.SimulationConfigDialog.SimulationConfig;
 
 public class NetworkEditor extends JFrame {
     private final CanvasPanel canvas;
     private final JLabel statusLabel = new JLabel("Ready");
+    private SimulationResultsWindow resultsWindow;
 
     public NetworkEditor() {
         super("Network Simulator - Editor");
@@ -19,11 +24,19 @@ public class NetworkEditor extends JFrame {
         add(canvas, BorderLayout.CENTER);
 
         JMenuBar menuBar = new JMenuBar();
+
         JMenu fileMenu = new JMenu("File");
         JMenuItem exportTcl = new JMenuItem("Export to NS-2 TCL...");
         exportTcl.addActionListener(e -> exportToTcl());
         fileMenu.add(exportTcl);
         menuBar.add(fileMenu);
+
+        JMenu simulateMenu = new JMenu("Simulate");
+        JMenuItem runSimulation = new JMenuItem("Run Simulation...");
+        runSimulation.addActionListener(e -> runSimulation());
+        simulateMenu.add(runSimulation);
+        menuBar.add(simulateMenu);
+
         setJMenuBar(menuBar);
 
         JLabel help = new JLabel(
@@ -75,6 +88,99 @@ public class NetworkEditor extends JFrame {
             JOptionPane.showMessageDialog(this, "Export failed: " + ex.getMessage(), "Error",
                     JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private void runSimulation() {
+        if (canvas.getNodes().isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "Please create some nodes before running simulation.",
+                    "No Network",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        SimulationConfigDialog dialog = new SimulationConfigDialog(this);
+        dialog.setVisible(true);
+
+        if (!dialog.isConfirmed()) {
+            return;
+        }
+
+        SimulationConfig config = dialog.getConfig();
+
+        JDialog progressDialog = new JDialog(this, "Running Simulation", true);
+        progressDialog.setLayout(new BorderLayout(10, 10));
+        JLabel progressLabel = new JLabel("Generating TCL script...", SwingConstants.CENTER);
+        progressLabel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        progressDialog.add(progressLabel, BorderLayout.CENTER);
+        JProgressBar progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true);
+        progressDialog.add(progressBar, BorderLayout.SOUTH);
+        progressDialog.setSize(400, 150);
+        progressDialog.setLocationRelativeTo(this);
+
+        SwingWorker<NS3ApiClient.SimulationResult, String> worker = new SwingWorker<NS3ApiClient.SimulationResult, String>() {
+
+            @Override
+            protected NS3ApiClient.SimulationResult doInBackground() throws Exception {
+                publish("Generating NS-2 TCL script...");
+                File tempTcl = File.createTempFile("network_sim_", ".tcl");
+                NS2TclGenerator.generateTcl(tempTcl, canvas.getNodes(), canvas.getLinks(), config);
+
+                publish("Uploading to NS-3 API...");
+                NS3ApiClient.SimulationResult result = NS3ApiClient.runSimulation(tempTcl);
+
+                tempTcl.delete();
+
+                return result;
+            }
+
+            @Override
+            protected void process(java.util.List<String> chunks) {
+                if (!chunks.isEmpty()) {
+                    progressLabel.setText(chunks.get(chunks.size() - 1));
+                }
+            }
+
+            @Override
+            protected void done() {
+                progressDialog.dispose();
+
+                try {
+                    NS3ApiClient.SimulationResult result = get();
+
+                    if (result.success) {
+                        if (resultsWindow == null) {
+                            resultsWindow = new SimulationResultsWindow();
+                        }
+
+                        String logs = result.traceLogs != null ? result.traceLogs : "No logs generated";
+                        resultsWindow.showResults(logs, result.namFile);
+
+                        JOptionPane.showMessageDialog(NetworkEditor.this,
+                                "Simulation completed successfully!\nResults displayed in separate window.",
+                                "Simulation Complete",
+                                JOptionPane.INFORMATION_MESSAGE);
+
+                    } else {
+                        JOptionPane.showMessageDialog(NetworkEditor.this,
+                                "Simulation failed:\n" + result.errorMessage,
+                                "Simulation Error",
+                                JOptionPane.ERROR_MESSAGE);
+                    }
+
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(NetworkEditor.this,
+                            "Simulation error: " + ex.getMessage(),
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        };
+
+        worker.execute();
+        progressDialog.setVisible(true);
     }
 
     public static void main(String[] args) {
