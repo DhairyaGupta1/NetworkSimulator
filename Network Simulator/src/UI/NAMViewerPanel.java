@@ -35,15 +35,22 @@ public class NAMViewerPanel extends JPanel {
         JPanel controlPanel = new JPanel(new BorderLayout());
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        rewindButton = new JButton("Rewind");
-        playButton = new JButton("Play");
-        pauseButton = new JButton("Pause");
-        stopButton = new JButton("Stop");
+        rewindButton = new JButton("⏮ Rewind");
+        playButton = new JButton("▶ Play");
+        pauseButton = new JButton("⏸ Pause");
+        stopButton = new JButton("⏹ Stop");
+
+        JButton exportNamButton = new JButton("💾 Export NAM");
+        JButton screenshotButton = new JButton("📸 Screenshot");
+        JButton recordButton = new JButton("🎥 Record GIF");
 
         rewindButton.addActionListener(e -> canvas.rewind());
         playButton.addActionListener(e -> canvas.play());
         pauseButton.addActionListener(e -> canvas.pause());
         stopButton.addActionListener(e -> canvas.stop());
+        exportNamButton.addActionListener(e -> exportNamFile());
+        screenshotButton.addActionListener(e -> takeScreenshot());
+        recordButton.addActionListener(e -> recordAnimation());
 
         pauseButton.setEnabled(false);
         stopButton.setEnabled(false);
@@ -52,6 +59,10 @@ public class NAMViewerPanel extends JPanel {
         buttonPanel.add(playButton);
         buttonPanel.add(pauseButton);
         buttonPanel.add(stopButton);
+        buttonPanel.add(Box.createHorizontalStrut(15)); // Spacing
+        buttonPanel.add(exportNamButton);
+        buttonPanel.add(screenshotButton);
+        buttonPanel.add(recordButton);
 
         JPanel sliderPanel = new JPanel(new BorderLayout());
         timeLabel = new JLabel("Time: 0.00s / 0.00s");
@@ -112,12 +123,119 @@ public class NAMViewerPanel extends JPanel {
         return currentNamFile;
     }
 
+    // Export NAM file to user-selected location
+    private void exportNamFile() {
+        if (currentNamFile == null) {
+            JOptionPane.showMessageDialog(this,
+                    "No NAM file loaded to export.",
+                    "No File", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Export NAM File");
+        fc.setSelectedFile(new File("network_animation.nam"));
+
+        if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            try {
+                File dest = fc.getSelectedFile();
+                java.nio.file.Files.copy(currentNamFile.toPath(), dest.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                JOptionPane.showMessageDialog(this,
+                        "NAM file exported successfully to:\n" + dest.getAbsolutePath(),
+                        "Export Complete", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this,
+                        "Failed to export NAM file: " + e.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    // Take screenshot of current animation frame
+    private void takeScreenshot() {
+        if (namData == null) {
+            JOptionPane.showMessageDialog(this,
+                    "No animation loaded to capture.",
+                    "No Animation", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Save Screenshot");
+        fc.setSelectedFile(new File("animation_screenshot.png"));
+
+        if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            try {
+                File outputFile = fc.getSelectedFile();
+                java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(
+                        canvas.getWidth(), canvas.getHeight(), java.awt.image.BufferedImage.TYPE_INT_RGB);
+                Graphics2D g2 = image.createGraphics();
+                canvas.paint(g2);
+                g2.dispose();
+
+                javax.imageio.ImageIO.write(image, "png", outputFile);
+                JOptionPane.showMessageDialog(this,
+                        "Screenshot saved to:\n" + outputFile.getAbsolutePath(),
+                        "Screenshot Saved", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this,
+                        "Failed to save screenshot: " + e.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    // Record animation as GIF (frame capture approach)
+    private void recordAnimation() {
+        if (namData == null) {
+            JOptionPane.showMessageDialog(this,
+                    "No animation loaded to record.",
+                    "No Animation", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        JOptionPane.showMessageDialog(this,
+                "GIF Recording:\n\n" +
+                        "1. Click OK to start recording\n" +
+                        "2. Play the animation (it will auto-capture frames)\n" +
+                        "3. Recording stops at the end\n\n" +
+                        "Note: For high-quality recordings, use screen recording software\n" +
+                        "like OBS Studio or Windows Game Bar (Win+G)",
+                "Recording Info", JOptionPane.INFORMATION_MESSAGE);
+
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Save Animation Frames");
+        fc.setSelectedFile(new File("animation_frames"));
+        fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+
+        if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File frameDir = fc.getSelectedFile();
+            if (!frameDir.exists()) {
+                frameDir.mkdirs();
+            }
+
+            canvas.startFrameCapture(frameDir);
+            JOptionPane.showMessageDialog(this,
+                    "Frame capture started!\n" +
+                            "Frames will be saved to: " + frameDir.getAbsolutePath() + "\n\n" +
+                            "Use a tool like FFmpeg to convert frames to GIF:\n" +
+                            "ffmpeg -i frame_%04d.png -vf fps=20 output.gif",
+                    "Recording Started", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
     private class AnimationCanvas extends JPanel {
         private NAMParser.NAMData data;
         private double currentTime = 0;
         private javax.swing.Timer animationTimer;
         private List<Packet> activePackets = new ArrayList<>();
         private int eventIndex = 0;
+
+        // Frame capture for recording
+        private boolean capturingFrames = false;
+        private File frameCaptureDir = null;
+        private int frameNumber = 0;
 
         private class Packet {
             double startTime;
@@ -193,7 +311,15 @@ public class NAMViewerPanel extends JPanel {
             this.currentTime = 0;
             this.eventIndex = 0;
             this.activePackets.clear();
+            this.capturingFrames = false;
+            this.frameNumber = 0;
             repaint();
+        }
+
+        public void startFrameCapture(File directory) {
+            this.frameCaptureDir = directory;
+            this.capturingFrames = true;
+            this.frameNumber = 0;
         }
 
         public void play() {
@@ -286,7 +412,7 @@ public class NAMViewerPanel extends JPanel {
         private void updatePacketPositions() {
             for (Packet pkt : activePackets) {
                 double elapsed = currentTime - pkt.startTime;
-                pkt.progress = Math.min(1.0, elapsed / 1.5); 
+                pkt.progress = Math.min(1.0, elapsed / 1.5);
             }
         }
 
@@ -536,12 +662,43 @@ public class NAMViewerPanel extends JPanel {
             g2.setFont(new Font("Arial", Font.PLAIN, 11));
             g2.setColor(Color.DARK_GRAY);
             g2.drawString("Events: " + eventIndex + "/" + data.events.size(), 170, legendY + 55);
+
+            // Frame capture indicator
+            if (capturingFrames) {
+                g2.setFont(new Font("Arial", Font.BOLD, 11));
+                g2.setColor(Color.RED);
+                g2.fillOval(350, legendY + 10, 12, 12);
+                g2.setColor(Color.BLACK);
+                g2.drawString("REC", 368, legendY + 20);
+            }
+
+            // Capture frame if recording
+            if (capturingFrames && frameCaptureDir != null) {
+                try {
+                    java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(
+                            getWidth(), getHeight(), java.awt.image.BufferedImage.TYPE_INT_RGB);
+                    Graphics2D g2d = image.createGraphics();
+                    paint(g2d);
+                    g2d.dispose();
+
+                    File frameFile = new File(frameCaptureDir, String.format("frame_%04d.png", frameNumber++));
+                    javax.imageio.ImageIO.write(image, "png", frameFile);
+
+                    // Stop capturing at end of animation
+                    if (currentTime >= data.maxTime) {
+                        capturingFrames = false;
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    capturingFrames = false;
+                }
+            }
         }
 
-        // Draw arrow on link to show direction
+        // Draw BIGGER and more distinct arrow on link to show direction
         private void drawArrow(Graphics2D g2, int x1, int y1, int x2, int y2, Color color) {
             double angle = Math.atan2(y2 - y1, x2 - x1);
-            int arrowSize = 10;
+            int arrowSize = 18; // BIGGER: was 10, now 18
 
             // Position arrow at 70% along the line
             int mx = (int) (x1 + (x2 - x1) * 0.7);
@@ -562,14 +719,20 @@ public class NAMViewerPanel extends JPanel {
             xPoints[2] = (int) (mx - arrowSize * Math.cos(angle + Math.PI / 6));
             yPoints[2] = (int) (my - arrowSize * Math.sin(angle + Math.PI / 6));
 
+            // BIGGER and more distinct - add border/outline
             g2.setColor(color);
             g2.fillPolygon(xPoints, yPoints, 3);
+
+            // Add white border for better visibility
+            g2.setColor(Color.WHITE);
+            g2.setStroke(new BasicStroke(2.5f));
+            g2.drawPolygon(xPoints, yPoints, 3);
         }
 
-        // Draw animated arrows flowing along the link
+        // Draw BIGGER animated arrows flowing along the link
         private void drawAnimatedArrow(Graphics2D g2, int x1, int y1, int x2, int y2, double position, Color color) {
             double angle = Math.atan2(y2 - y1, x2 - x1);
-            int arrowSize = 8;
+            int arrowSize = 14; // BIGGER: was 8, now 14
 
             // Position arrow at specified position along the line (0.0 to 1.0)
             int mx = (int) (x1 + (x2 - x1) * position);
@@ -591,11 +754,13 @@ public class NAMViewerPanel extends JPanel {
             yPoints[2] = (int) (my - arrowSize * Math.sin(angle + Math.PI / 6));
 
             // Fade based on position for smooth appearance
-            int alpha = (int) (200 * (1.0 - Math.abs(position - 0.5) * 0.5));
+            int alpha = (int) (220 * (1.0 - Math.abs(position - 0.5) * 0.4)); // More visible
             g2.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
             g2.fillPolygon(xPoints, yPoints, 3);
+
+            // BIGGER white border for better distinction
             g2.setColor(Color.WHITE);
-            g2.setStroke(new BasicStroke(1));
+            g2.setStroke(new BasicStroke(2f)); // Thicker border: was 1, now 2
             g2.drawPolygon(xPoints, yPoints, 3);
         }
     }
