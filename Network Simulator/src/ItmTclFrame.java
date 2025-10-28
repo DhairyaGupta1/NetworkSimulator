@@ -28,16 +28,6 @@ public class ItmTclFrame {
         this.nodes = nodes;
         this.links = links;
     }
-
-    /**
-     * Write a TCL file describing the nodes and duplex links.
-     *
-     * @param outFile    destination file to write (will be overwritten)
-     * @param simTimeSec simulation time in seconds used for stop/halt scheduling
-     * @param bandwidth  bandwidth string used for duplex links (e.g. "100.0Mb")
-     * @param delay      delay string used for duplex links (e.g. "1ms")
-     * @throws IOException on IO errors
-     */
     public void writeTcl(File outFile, int simTimeSec, String bandwidth, String delay) throws IOException {
         if (bandwidth == null || bandwidth.isEmpty()) bandwidth = "100.0Mb";
         if (delay == null || delay.isEmpty()) delay = "1ms";
