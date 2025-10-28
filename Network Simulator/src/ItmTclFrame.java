@@ -1,5 +1,3 @@
-package nsg.p2p;
-
 import Components.Link;
 import Components.Node;
 
@@ -28,9 +26,12 @@ public class ItmTclFrame {
         this.nodes = nodes;
         this.links = links;
     }
+
     public void writeTcl(File outFile, int simTimeSec, String bandwidth, String delay) throws IOException {
-        if (bandwidth == null || bandwidth.isEmpty()) bandwidth = "100.0Mb";
-        if (delay == null || delay.isEmpty()) delay = "1ms";
+        if (bandwidth == null || bandwidth.isEmpty())
+            bandwidth = "100.0Mb";
+        if (delay == null || delay.isEmpty())
+            delay = "1ms";
 
         // map Node.id -> tcl variable name (n<ID>)
         Map<Long, String> nodeVar = new HashMap<>();
@@ -73,7 +74,8 @@ public class ItmTclFrame {
 
             out.flush();
         } finally {
-            if (out != null) out.close();
+            if (out != null)
+                out.close();
         }
     }
 
@@ -81,7 +83,7 @@ public class ItmTclFrame {
      * Static convenience method.
      */
     public static void writeTcl(File outFile, Collection<Node> nodes, Collection<Link> links, int simTimeSec,
-                                String bandwidth, String delay) throws IOException {
+            String bandwidth, String delay) throws IOException {
         new ItmTclFrame(nodes, links).writeTcl(outFile, simTimeSec, bandwidth, delay);
     }
 }
