@@ -47,6 +47,15 @@ public class CanvasPanel extends JPanel {
     private final java.util.Deque<Command> undoStack = new java.util.ArrayDeque<>();
     private final java.util.Deque<Command> redoStack = new java.util.ArrayDeque<>();
 
+    // Accessor methods for export functionality
+    public List<Node> getNodes() {
+        return new ArrayList<>(nodes);
+    }
+
+    public List<Link> getLinks() {
+        return new ArrayList<>(links);
+    }
+
     private interface Command {
         void execute();
 
