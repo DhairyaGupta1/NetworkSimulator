@@ -696,7 +696,7 @@ public class NAMViewerPanel extends JPanel {
 
             xPoints[1] = (int) (mx - arrowSize * Math.cos(angle - Math.PI / 6));
             yPoints[1] = (int) (my - arrowSize * Math.sin(angle - Math.PI / 6));
-=
+
             xPoints[2] = (int) (mx - arrowSize * Math.cos(angle + Math.PI / 6));
             yPoints[2] = (int) (my - arrowSize * Math.sin(angle + Math.PI / 6));
 

@@ -14,10 +14,41 @@ public class GeminiPacketGenerator {
 
     private static String loadApiKey() {
         Properties props = new Properties();
-        String configPath = "config.properties";
+        
+        // Try multiple locations for config.properties
+        String[] possiblePaths = {
+            "config.properties",                           // Current directory
+            "Network Simulator/config.properties",         // From project root
+            "app/config.properties",                       // In jpackage app folder
+            System.getProperty("user.dir") + "/config.properties"
+        };
+        
+        InputStream input = null;
+        String configPath = null;
+        
+        for (String path : possiblePaths) {
+            try {
+                input = new FileInputStream(path);
+                configPath = path;
+                break;
+            } catch (FileNotFoundException e) {
+                // Try next path
+            }
+        }
+        
+        if (input == null) {
+            throw new RuntimeException(
+                    "⚠️ Configuration file not found!\n" +
+                            "Please:\n" +
+                            "1. Copy 'config.properties.template' to 'config.properties'\n" +
+                            "2. Add your Gemini API key from https://makersuite.google.com/app/apikey\n" +
+                            "Looked in: " + String.join(", ", possiblePaths));
+        }
 
-        try (InputStream input = new FileInputStream(configPath)) {
+        try {
             props.load(input);
+            input.close(); // Close the stream
+            
             String apiKey = props.getProperty("gemini.api.key");
 
             if (apiKey == null || apiKey.trim().isEmpty() || apiKey.equals("YOUR_GEMINI_API_KEY_HERE")) {
@@ -30,13 +61,6 @@ public class GeminiPacketGenerator {
             }
 
             return apiKey.trim();
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(
-                    "⚠️ Configuration file not found!\n" +
-                            "Please:\n" +
-                            "1. Copy 'config.properties.template' to 'config.properties'\n" +
-                            "2. Add your Gemini API key from https://makersuite.google.com/app/apikey",
-                    e);
         } catch (IOException e) {
             throw new RuntimeException("Error reading configuration file: " + e.getMessage(), e);
         }

@@ -291,25 +291,55 @@ public class SimulationResultsWindow extends JFrame {
                     icmpCount, (icmpCount * 100.0 / packets.size()));
             packetStatsLabel.setText(stats);
 
-            packetTableModel.setRowCount(0);
+            // Optimized batch table population - MUCH faster for large datasets!
+            // Disable auto-sorting during bulk update
+            packetTable.setAutoCreateRowSorter(false);
+            
+            // Build all rows in a Vector for setDataVector (fastest method)
+            java.util.Vector<java.util.Vector<Object>> dataVector = new java.util.Vector<>();
+            double baseTimestamp = packets.get(0).timestamp;
+            
             for (NetworkPacket pkt : packets) {
-                packetTableModel.addRow(new Object[] {
-                        pkt.packetId,
-                        String.format("%.3f", pkt.timestamp - packets.get(0).timestamp),
-                        pkt.sourceIP,
-                        pkt.destIP,
-                        pkt.sourcePort,
-                        pkt.destPort,
-                        pkt.protocol,
-                        pkt.packetSize,
-                        pkt.trafficType,
-                        pkt.attackType != null ? pkt.attackType : "-",
-                        pkt.payload != null ? pkt.payload : "",
-                        String.format("%.2f ms", pkt.latency * 1000),
-                        String.format("%.1f pps", pkt.packetRate),
-                        pkt.applicationType
-                });
+                java.util.Vector<Object> row = new java.util.Vector<>();
+                row.add(pkt.packetId);
+                row.add(String.format("%.3f", pkt.timestamp - baseTimestamp));
+                row.add(pkt.sourceIP);
+                row.add(pkt.destIP);
+                row.add(pkt.sourcePort);
+                row.add(pkt.destPort);
+                row.add(pkt.protocol);
+                row.add(pkt.packetSize);
+                row.add(pkt.trafficType);
+                row.add(pkt.attackType != null ? pkt.attackType : "-");
+                row.add(pkt.payload != null ? pkt.payload : "");
+                row.add(String.format("%.2f ms", pkt.latency * 1000));
+                row.add(String.format("%.1f pps", pkt.packetRate));
+                row.add(pkt.applicationType);
+                dataVector.add(row);
             }
+            
+            // Column names
+            java.util.Vector<String> columnNames = new java.util.Vector<>();
+            columnNames.add("Packet ID");
+            columnNames.add("Time (s)");
+            columnNames.add("Source IP");
+            columnNames.add("Dest IP");
+            columnNames.add("Src Port");
+            columnNames.add("Dst Port");
+            columnNames.add("Protocol");
+            columnNames.add("Size");
+            columnNames.add("Type");
+            columnNames.add("Attack");
+            columnNames.add("Payload");
+            columnNames.add("Latency");
+            columnNames.add("Rate");
+            columnNames.add("App");
+            
+            // Update table in ONE operation (triggers single UI update)
+            packetTableModel.setDataVector(dataVector, columnNames);
+            
+            // Re-enable sorting after data is loaded
+            packetTable.setAutoCreateRowSorter(true);
 
             tabbedPane.setSelectedIndex(tabbedPane.getTabCount() - 1);
 
