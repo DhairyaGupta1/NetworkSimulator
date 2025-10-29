@@ -14,6 +14,9 @@ public class SimulationConfigDialog extends JDialog {
     private JTextField dataRateField;
     private JCheckBox enableTracingCheck;
     private JCheckBox enableNamCheck;
+    private JCheckBox enableDatasetCheck;
+    private JTextField datasetPacketCountField;
+    private JComboBox<String> datasetScenarioCombo;
     private boolean confirmed = false;
 
     public SimulationConfigDialog(JFrame parent) {
@@ -106,6 +109,49 @@ public class SimulationConfigDialog extends JDialog {
         gbc.gridwidth = 2;
         enableNamCheck = new JCheckBox("Enable NAM Animation (.nam)", true);
         mainPanel.add(enableNamCheck, gbc);
+        row++;
+
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.gridwidth = 2;
+        JLabel datasetLabel = new JLabel("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        mainPanel.add(datasetLabel, gbc);
+        row++;
+
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.gridwidth = 2;
+        enableDatasetCheck = new JCheckBox("📊 Generate Network Packet Dataset (Optional)", false);
+        enableDatasetCheck.setFont(enableDatasetCheck.getFont().deriveFont(Font.BOLD));
+        enableDatasetCheck.addActionListener(e -> {
+            boolean enabled = enableDatasetCheck.isSelected();
+            datasetPacketCountField.setEnabled(enabled);
+            datasetScenarioCombo.setEnabled(enabled);
+        });
+        mainPanel.add(enableDatasetCheck, gbc);
+        gbc.gridwidth = 1;
+        row++;
+
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        mainPanel.add(new JLabel("  Packet Count:"), gbc);
+        gbc.gridx = 1;
+        datasetPacketCountField = new JTextField("200", 15);
+        datasetPacketCountField.setEnabled(false);
+        mainPanel.add(datasetPacketCountField, gbc);
+        row++;
+
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        mainPanel.add(new JLabel("  Traffic Scenario:"), gbc);
+        gbc.gridx = 1;
+        datasetScenarioCombo = new JComboBox<>(new String[] {
+                "Normal Traffic", "DDoS Attack", "Port Scan",
+                "Mixed Traffic", "Web Attack", "Malware Communication"
+        });
+        datasetScenarioCombo.setSelectedIndex(3); // Default to Mixed Traffic
+        datasetScenarioCombo.setEnabled(false);
+        mainPanel.add(datasetScenarioCombo, gbc);
 
         add(mainPanel, BorderLayout.CENTER);
 
@@ -147,6 +193,11 @@ public class SimulationConfigDialog extends JDialog {
         config.dataRate = dataRateField.getText().trim();
         config.enableTracing = enableTracingCheck.isSelected();
         config.enableNam = enableNamCheck.isSelected();
+        config.enableDataset = enableDatasetCheck.isSelected();
+        if (config.enableDataset) {
+            config.datasetPacketCount = Integer.parseInt(datasetPacketCountField.getText().trim());
+            config.datasetScenario = (String) datasetScenarioCombo.getSelectedItem();
+        }
         return config;
     }
 
@@ -161,5 +212,8 @@ public class SimulationConfigDialog extends JDialog {
         public String dataRate;
         public boolean enableTracing;
         public boolean enableNam;
+        public boolean enableDataset;
+        public int datasetPacketCount;
+        public String datasetScenario;
     }
 }

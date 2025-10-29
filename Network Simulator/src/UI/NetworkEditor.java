@@ -7,6 +7,8 @@ import Exporters.ItmTclFrame;
 import Exporters.NS2TclGenerator;
 import Exporters.NS3ApiClient;
 import UI.SimulationConfigDialog.SimulationConfig;
+import AI.GeminiPacketGenerator;
+import AI.GeminiPacketGenerator.NetworkPacket;
 
 public class NetworkEditor extends JFrame {
     private final CanvasPanel canvas;
@@ -99,7 +101,6 @@ public class NetworkEditor extends JFrame {
             return;
         }
 
-        // Step 1: Configure simulation parameters
         SimulationConfigDialog configDialog = new SimulationConfigDialog(this);
         configDialog.setVisible(true);
 
@@ -109,7 +110,6 @@ public class NetworkEditor extends JFrame {
 
         SimulationConfig config = configDialog.getConfig();
 
-        // Step 2: Configure packet flows (routing)
         RoutingConfigDialog routingDialog = new RoutingConfigDialog(this, canvas.getNodes());
         routingDialog.setVisible(true);
 
@@ -160,18 +160,57 @@ public class NetworkEditor extends JFrame {
                 try {
                     NS3ApiClient.SimulationResult result = get();
 
+                    System.out.println("DEBUG: Simulation done. Success=" + result.success);
+
                     if (result.success) {
                         if (resultsWindow == null) {
                             resultsWindow = new SimulationResultsWindow();
+                            System.out.println("DEBUG: Created new SimulationResultsWindow");
                         }
 
                         String logs = result.traceLogs != null ? result.traceLogs : "No logs generated";
-                        resultsWindow.showResults(logs, result.namFile);
 
-                        JOptionPane.showMessageDialog(NetworkEditor.this,
-                                "Simulation completed successfully!\nResults displayed in separate window.",
-                                "Simulation Complete",
-                                JOptionPane.INFORMATION_MESSAGE);
+                        resultsWindow.showResults(logs, result.namFile);
+                        System.out.println("DEBUG: Results window shown with logs and NAM");
+
+                        if (config.enableDataset) {
+                            System.out.println("DEBUG: Starting background packet generation");
+                            resultsWindow.showGeneratingDatasetPlaceholder();
+
+                            new Thread(() -> {
+                                try {
+                                    System.out.println("DEBUG: Calling Gemini API with simulation config...");
+                                    java.util.List<NetworkPacket> packets = GeminiPacketGenerator
+                                            .generatePacketsFromTopology(
+                                                    canvas.getNodes(),
+                                                    canvas.getLinks(),
+                                                    config.datasetPacketCount,
+                                                    config.datasetScenario,
+                                                    config);
+
+                                    System.out.println("DEBUG: Packets generated: " + packets.size());
+
+                                    SwingUtilities.invokeLater(() -> {
+                                        resultsWindow.setPacketData(packets);
+                                        System.out.println("DEBUG: Packet data updated in UI");
+                                    });
+
+                                } catch (Exception ex) {
+                                    ex.printStackTrace();
+                                    SwingUtilities.invokeLater(() -> {
+                                        JOptionPane.showMessageDialog(NetworkEditor.this,
+                                                "Packet generation failed: " + ex.getMessage(),
+                                                "Generation Error",
+                                                JOptionPane.ERROR_MESSAGE);
+                                    });
+                                }
+                            }).start();
+                        } else {
+                            JOptionPane.showMessageDialog(NetworkEditor.this,
+                                    "Simulation completed successfully!",
+                                    "Simulation Complete",
+                                    JOptionPane.INFORMATION_MESSAGE);
+                        }
 
                     } else {
                         JOptionPane.showMessageDialog(NetworkEditor.this,

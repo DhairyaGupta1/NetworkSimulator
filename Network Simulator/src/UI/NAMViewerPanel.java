@@ -123,7 +123,6 @@ public class NAMViewerPanel extends JPanel {
         return currentNamFile;
     }
 
-    // Export NAM file to user-selected location
     private void exportNamFile() {
         if (currentNamFile == null) {
             JOptionPane.showMessageDialog(this,
@@ -152,7 +151,6 @@ public class NAMViewerPanel extends JPanel {
         }
     }
 
-    // Take screenshot of current animation frame
     private void takeScreenshot() {
         if (namData == null) {
             JOptionPane.showMessageDialog(this,
@@ -186,7 +184,6 @@ public class NAMViewerPanel extends JPanel {
         }
     }
 
-    // Record animation as GIF (frame capture approach)
     private void recordAnimation() {
         if (namData == null) {
             JOptionPane.showMessageDialog(this,
@@ -232,7 +229,6 @@ public class NAMViewerPanel extends JPanel {
         private List<Packet> activePackets = new ArrayList<>();
         private int eventIndex = 0;
 
-        // Frame capture for recording
         private boolean capturingFrames = false;
         private File frameCaptureDir = null;
         private int frameNumber = 0;
@@ -401,7 +397,6 @@ public class NAMViewerPanel extends JPanel {
 
         private void processEvent(NAMParser.NAMEvent event) {
             if (event.type.equals("h") || event.type.equals("+")) {
-                // Don't add if we're already at max capacity
                 if (activePackets.size() < 150) {
                     Packet pkt = new Packet(event.srcNode, event.dstNode, event.packetType, event.time);
                     activePackets.add(pkt);
@@ -437,34 +432,29 @@ public class NAMViewerPanel extends JPanel {
             g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED); // Optimize for speed
             g2.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_SPEED);
 
-            // Calculate viewport with minimal margin
             double margin = 60;
             double width = getWidth() - 2 * margin;
             double height = getHeight() - 2 * margin - 100; // Space for legend
 
-            // Use actual canvas coordinates - no artificial scaling
             double dataWidth = Math.max(data.maxX - data.minX, 100);
             double dataHeight = Math.max(data.maxY - data.minY, 100);
 
             double scale = Math.min(width / dataWidth, height / dataHeight) * 0.9;
 
-            // Draw links with animated arrows when packets are flowing
             g2.setStroke(new BasicStroke(3));
 
-            // OPTIMIZATION: Track which links have active packets (do this once)
             java.util.Map<String, Integer> linkPacketCount = new java.util.HashMap<>();
             int visiblePacketCount = 0;
             for (Packet pkt : activePackets) {
-                if (pkt.visualProgress < 0.95) { // Only count visible packets
+                if (pkt.visualProgress < 0.95) {
                     String linkKey = Math.min(pkt.srcNode, pkt.dstNode) + "-" + Math.max(pkt.srcNode, pkt.dstNode);
                     linkPacketCount.put(linkKey, linkPacketCount.getOrDefault(linkKey, 0) + 1);
                     visiblePacketCount++;
                 }
             }
 
-            // OPTIMIZATION: Reduce arrow animations if too many packets
             boolean heavyLoad = visiblePacketCount > 50;
-            int arrowCount = heavyLoad ? 1 : 3; // Reduce animated arrows under load
+            int arrowCount = heavyLoad ? 1 : 3;
 
             for (NAMParser.NAMLink link : data.links) {
                 NAMParser.NAMNode n1 = data.nodes.get(link.srcNode);
@@ -478,10 +468,8 @@ public class NAMViewerPanel extends JPanel {
                     String linkKey = Math.min(link.srcNode, link.dstNode) + "-" + Math.max(link.srcNode, link.dstNode);
                     boolean hasPackets = linkPacketCount.containsKey(linkKey);
 
-                    // Draw link line - simplified under heavy load
                     if (hasPackets) {
                         if (!heavyLoad) {
-                            // Animated glow effect for active links (only when not under load)
                             float pulse = (float) (0.7 + 0.3 * Math.sin(currentTime * 3));
                             g2.setColor(new Color(50, 150, 255, (int) (100 * pulse)));
                             g2.setStroke(new BasicStroke(6));
@@ -495,17 +483,14 @@ public class NAMViewerPanel extends JPanel {
                     }
                     g2.drawLine(x1, y1, x2, y2);
 
-                    // Draw animated directional arrows on active links
                     if (hasPackets) {
                         int packetCount = linkPacketCount.get(linkKey);
 
-                        // Animated arrows (reduced count under load)
                         for (int i = 0; i < arrowCount; i++) {
                             double offset = (currentTime * 0.3 + i * (1.0 / arrowCount)) % 1.0;
                             drawAnimatedArrow(g2, x1, y1, x2, y2, offset, new Color(70, 170, 255));
                         }
 
-                        // Show packet count only if not too many to render
                         if (!heavyLoad) {
                             g2.setFont(new Font("Arial", Font.BOLD, 10));
                             g2.setColor(new Color(255, 100, 50));
@@ -514,7 +499,6 @@ public class NAMViewerPanel extends JPanel {
                             String countLabel = packetCount + "p";
                             FontMetrics fm = g2.getFontMetrics();
 
-                            // Simplified background
                             int labelWidth = fm.stringWidth(countLabel);
                             g2.setColor(new Color(255, 255, 255, 220));
                             g2.fillRoundRect(mx - labelWidth / 2 - 3, my - 16, labelWidth + 6, 14, 4, 4);
@@ -523,22 +507,19 @@ public class NAMViewerPanel extends JPanel {
                             g2.drawString(countLabel, mx - labelWidth / 2, my - 6);
                         }
                     } else {
-                        // Static arrow for inactive links
                         drawArrow(g2, x1, y1, x2, y2, new Color(100, 100, 100));
                     }
                 }
             }
 
-            // OPTIMIZED packet rendering - batch operations and skip unnecessary details
             int packetCount = 0;
 
-            // Pre-create common colors to avoid allocations
             Color glowColor, borderColor = Color.WHITE;
             BasicStroke packetStroke = new BasicStroke(1.5f);
 
             for (Packet pkt : activePackets) {
                 if (pkt.visualProgress >= 0.95)
-                    continue; // Skip nearly complete packets
+                    continue;
 
                 NAMParser.NAMNode src = data.nodes.get(pkt.srcNode);
                 NAMParser.NAMNode dst = data.nodes.get(pkt.dstNode);
@@ -550,30 +531,23 @@ public class NAMViewerPanel extends JPanel {
                 int x2 = (int) (margin + (dst.x - data.minX) * scale);
                 int y2 = (int) (margin + (dst.y - data.minY) * scale);
 
-                // Use visual progress for smooth movement
                 int px = (int) (x1 + (x2 - x1) * pkt.visualProgress);
                 int py = (int) (y1 + (y2 - y1) * pkt.visualProgress);
 
-                // Ultra-simplified rendering under heavy load
                 if (heavyLoad) {
-                    // Just solid colored circles, no glow, no borders, no labels
                     g2.setColor(pkt.color);
                     g2.fillOval(px - 6, py - 6, 12, 12);
                 } else {
-                    // Normal rendering with effects
                     glowColor = new Color(pkt.color.getRed(), pkt.color.getGreen(), pkt.color.getBlue(), 80);
                     g2.setColor(glowColor);
                     g2.fillOval(px - 12, py - 12, 24, 24); // Glow
 
                     g2.setColor(pkt.color);
                     g2.fillOval(px - 8, py - 8, 16, 16); // Packet
-
-                    // White border
                     g2.setColor(borderColor);
                     g2.setStroke(packetStroke);
                     g2.drawOval(px - 8, py - 8, 16, 16);
 
-                    // Label only if not too many packets
                     if (visiblePacketCount < 30) {
                         g2.setFont(new Font("Arial", Font.BOLD, 8));
                         String pktLabel = pkt.label;
@@ -585,25 +559,20 @@ public class NAMViewerPanel extends JPanel {
                 packetCount++;
             }
 
-            // Draw nodes - use actual NAM data with labels
             for (NAMParser.NAMNode node : data.nodes.values()) {
                 int x = (int) (margin + (node.x - data.minX) * scale);
                 int y = (int) (margin + (node.y - data.minY) * scale);
 
-                // Node shadow
                 g2.setColor(new Color(0, 0, 0, 40));
                 g2.fillOval(x - 27, y - 25, 54, 54);
 
-                // Node circle - larger and clearer
                 g2.setColor(new Color(70, 130, 180));
                 g2.fillOval(x - 25, y - 25, 50, 50);
 
-                // White border
                 g2.setColor(Color.WHITE);
                 g2.setStroke(new BasicStroke(2.5f));
                 g2.drawOval(x - 25, y - 25, 50, 50);
 
-                // Node label from NAM data or use ID
                 g2.setColor(Color.WHITE);
                 g2.setFont(new Font("Arial", Font.BOLD, 16));
                 FontMetrics fm = g2.getFontMetrics();
@@ -612,7 +581,6 @@ public class NAMViewerPanel extends JPanel {
                 int ly = y + fm.getAscent() / 2 - 2;
                 g2.drawString(label, lx, ly);
 
-                // Node description below (use NAM label if available)
                 g2.setColor(Color.BLACK);
                 g2.setFont(new Font("Arial", Font.BOLD, 11));
                 fm = g2.getFontMetrics();
@@ -621,7 +589,6 @@ public class NAMViewerPanel extends JPanel {
                 g2.drawString(desc, lx, y + 38);
             }
 
-            // Draw legend and packet count with performance indicator
             int legendY = getHeight() - 80;
             g2.setColor(new Color(255, 255, 255, 230));
             g2.fillRoundRect(20, legendY, 400, 70, 10, 10);
@@ -632,38 +599,32 @@ public class NAMViewerPanel extends JPanel {
             g2.setFont(new Font("Arial", Font.BOLD, 14));
             g2.drawString("Packet Legend:", 30, legendY + 20);
 
-            // TCP
             g2.setColor(new Color(0, 120, 215));
             g2.fillOval(30, legendY + 30, 16, 16);
             g2.setColor(Color.BLACK);
             g2.setFont(new Font("Arial", Font.PLAIN, 11));
             g2.drawString("TCP", 52, legendY + 43);
 
-            // UDP
             g2.setColor(new Color(0, 180, 100));
             g2.fillOval(95, legendY + 30, 16, 16);
             g2.setColor(Color.BLACK);
             g2.drawString("UDP", 117, legendY + 43);
 
-            // Packet count with performance mode indicator
             g2.setFont(new Font("Arial", Font.BOLD, 13));
             g2.setColor(new Color(220, 50, 50));
             String perfMode = heavyLoad ? " [TURBO]" : "";
             g2.drawString("Active: " + packetCount + perfMode, 170, legendY + 20);
 
-            // Performance status
             if (heavyLoad) {
                 g2.setFont(new Font("Arial", Font.PLAIN, 10));
                 g2.setColor(new Color(255, 140, 0));
                 g2.drawString("⚡ Performance mode active", 170, legendY + 38);
             }
 
-            // Event count
             g2.setFont(new Font("Arial", Font.PLAIN, 11));
             g2.setColor(Color.DARK_GRAY);
             g2.drawString("Events: " + eventIndex + "/" + data.events.size(), 170, legendY + 55);
 
-            // Frame capture indicator
             if (capturingFrames) {
                 g2.setFont(new Font("Arial", Font.BOLD, 11));
                 g2.setColor(Color.RED);
@@ -672,7 +633,6 @@ public class NAMViewerPanel extends JPanel {
                 g2.drawString("REC", 368, legendY + 20);
             }
 
-            // Capture frame if recording
             if (capturingFrames && frameCaptureDir != null) {
                 try {
                     java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(
@@ -684,7 +644,6 @@ public class NAMViewerPanel extends JPanel {
                     File frameFile = new File(frameCaptureDir, String.format("frame_%04d.png", frameNumber++));
                     javax.imageio.ImageIO.write(image, "png", frameFile);
 
-                    // Stop capturing at end of animation
                     if (currentTime >= data.maxTime) {
                         capturingFrames = false;
                     }
@@ -695,72 +654,58 @@ public class NAMViewerPanel extends JPanel {
             }
         }
 
-        // Draw BIGGER and more distinct arrow on link to show direction
         private void drawArrow(Graphics2D g2, int x1, int y1, int x2, int y2, Color color) {
             double angle = Math.atan2(y2 - y1, x2 - x1);
-            int arrowSize = 18; // BIGGER: was 10, now 18
+            int arrowSize = 18;
 
-            // Position arrow at 70% along the line
             int mx = (int) (x1 + (x2 - x1) * 0.7);
             int my = (int) (y1 + (y2 - y1) * 0.7);
 
             int[] xPoints = new int[3];
             int[] yPoints = new int[3];
 
-            // Arrow tip
             xPoints[0] = mx;
             yPoints[0] = my;
 
-            // Arrow base left
             xPoints[1] = (int) (mx - arrowSize * Math.cos(angle - Math.PI / 6));
             yPoints[1] = (int) (my - arrowSize * Math.sin(angle - Math.PI / 6));
 
-            // Arrow base right
             xPoints[2] = (int) (mx - arrowSize * Math.cos(angle + Math.PI / 6));
             yPoints[2] = (int) (my - arrowSize * Math.sin(angle + Math.PI / 6));
 
-            // BIGGER and more distinct - add border/outline
             g2.setColor(color);
             g2.fillPolygon(xPoints, yPoints, 3);
 
-            // Add white border for better visibility
             g2.setColor(Color.WHITE);
             g2.setStroke(new BasicStroke(2.5f));
             g2.drawPolygon(xPoints, yPoints, 3);
         }
 
-        // Draw BIGGER animated arrows flowing along the link
         private void drawAnimatedArrow(Graphics2D g2, int x1, int y1, int x2, int y2, double position, Color color) {
             double angle = Math.atan2(y2 - y1, x2 - x1);
-            int arrowSize = 14; // BIGGER: was 8, now 14
+            int arrowSize = 14;
 
-            // Position arrow at specified position along the line (0.0 to 1.0)
             int mx = (int) (x1 + (x2 - x1) * position);
             int my = (int) (y1 + (y2 - y1) * position);
 
             int[] xPoints = new int[3];
             int[] yPoints = new int[3];
 
-            // Arrow tip
             xPoints[0] = mx;
             yPoints[0] = my;
 
-            // Arrow base left
             xPoints[1] = (int) (mx - arrowSize * Math.cos(angle - Math.PI / 6));
             yPoints[1] = (int) (my - arrowSize * Math.sin(angle - Math.PI / 6));
-
-            // Arrow base right
+=
             xPoints[2] = (int) (mx - arrowSize * Math.cos(angle + Math.PI / 6));
             yPoints[2] = (int) (my - arrowSize * Math.sin(angle + Math.PI / 6));
 
-            // Fade based on position for smooth appearance
-            int alpha = (int) (220 * (1.0 - Math.abs(position - 0.5) * 0.4)); // More visible
+            int alpha = (int) (220 * (1.0 - Math.abs(position - 0.5) * 0.4));
             g2.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha));
             g2.fillPolygon(xPoints, yPoints, 3);
 
-            // BIGGER white border for better distinction
             g2.setColor(Color.WHITE);
-            g2.setStroke(new BasicStroke(2f)); // Thicker border: was 1, now 2
+            g2.setStroke(new BasicStroke(2f)); 
             g2.drawPolygon(xPoints, yPoints, 3);
         }
     }

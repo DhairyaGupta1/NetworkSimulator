@@ -1,6 +1,6 @@
 @echo off
-REM Delegate to PowerShell script (handles paths with spaces)
-REM Usage: run.bat
+REM 
+REM 
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0run.ps1"
 if errorlevel 1 (

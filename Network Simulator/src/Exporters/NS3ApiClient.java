@@ -5,6 +5,7 @@ import java.net.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.zip.*;
+import AI.GeminiPacketGenerator.NetworkPacket;
 
 public class NS3ApiClient {
     private static final String API_URL = "https://api.ns3.azaken.com/simulate";
@@ -16,6 +17,7 @@ public class NS3ApiClient {
         public File namFile;
         public boolean success;
         public String errorMessage;
+        public List<NetworkPacket> generatedPackets;
     }
 
     public static SimulationResult runSimulation(File tclFile) throws IOException {
@@ -33,7 +35,6 @@ public class NS3ApiClient {
             try (OutputStream out = conn.getOutputStream();
                     PrintWriter writer = new PrintWriter(new OutputStreamWriter(out, "UTF-8"), true)) {
 
-                // Write file part
                 writer.append("--").append(boundary).append("\r\n");
                 writer.append("Content-Disposition: form-data; name=\"file\"; filename=\"")
                         .append(tclFile.getName()).append("\"\r\n");

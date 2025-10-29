@@ -7,10 +7,6 @@ import java.awt.*;
 import java.util.*;
 import java.util.List;
 
-/**
- * Dialog for configuring packet flows between nodes
- * Allows users to define multiple traffic flows with source, destination, and protocol
- */
 public class RoutingConfigDialog extends JDialog {
     private JTable flowTable;
     private DefaultTableModel tableModel;
@@ -26,7 +22,7 @@ public class RoutingConfigDialog extends JDialog {
     public static class TrafficFlow {
         public long srcNodeId;
         public long dstNodeId;
-        public String flowType; // "TCP", "UDP", "CBR", "FTP", etc.
+        public String flowType;
         public double startTime;
         public double stopTime;
 
@@ -40,8 +36,8 @@ public class RoutingConfigDialog extends JDialog {
 
         @Override
         public String toString() {
-            return String.format("N%d → N%d (%s) [%.1fs - %.1fs]", 
-                srcNodeId, dstNodeId, flowType, startTime, stopTime);
+            return String.format("N%d → N%d (%s) [%.1fs - %.1fs]",
+                    srcNodeId, dstNodeId, flowType, startTime, stopTime);
         }
     }
 
@@ -49,11 +45,10 @@ public class RoutingConfigDialog extends JDialog {
         super(parent, "Configure Packet Flows", true);
         this.nodes = nodes;
         this.flows = new ArrayList<>();
-        
+
         setLayout(new BorderLayout(10, 10));
         setSize(700, 500);
 
-        // Top panel - Add flow controls
         JPanel topPanel = new JPanel(new GridBagLayout());
         topPanel.setBorder(BorderFactory.createTitledBorder("Add New Flow"));
         GridBagConstraints gbc = new GridBagConstraints();
@@ -61,7 +56,6 @@ public class RoutingConfigDialog extends JDialog {
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Source node
         gbc.gridx = 0;
         gbc.gridy = 0;
         topPanel.add(new JLabel("Source Node:"), gbc);
@@ -72,7 +66,6 @@ public class RoutingConfigDialog extends JDialog {
         }
         topPanel.add(srcNodeCombo, gbc);
 
-        // Destination node
         gbc.gridx = 2;
         topPanel.add(new JLabel("Destination:"), gbc);
         gbc.gridx = 3;
@@ -82,24 +75,21 @@ public class RoutingConfigDialog extends JDialog {
         }
         topPanel.add(dstNodeCombo, gbc);
 
-        // Flow type
         gbc.gridx = 0;
         gbc.gridy = 1;
         topPanel.add(new JLabel("Flow Type:"), gbc);
         gbc.gridx = 1;
-        flowTypeCombo = new JComboBox<>(new String[]{
-            "TCP/FTP", "TCP/Telnet", "UDP/CBR", "UDP/Exponential"
+        flowTypeCombo = new JComboBox<>(new String[] {
+                "TCP/FTP", "TCP/Telnet", "UDP/CBR", "UDP/Exponential"
         });
         topPanel.add(flowTypeCombo, gbc);
 
-        // Start time
         gbc.gridx = 2;
         topPanel.add(new JLabel("Start Time (s):"), gbc);
         gbc.gridx = 3;
         startTimeField = new JTextField("0.5", 10);
         topPanel.add(startTimeField, gbc);
 
-        // Stop time
         gbc.gridx = 0;
         gbc.gridy = 2;
         topPanel.add(new JLabel("Stop Time (s):"), gbc);
@@ -107,7 +97,6 @@ public class RoutingConfigDialog extends JDialog {
         stopTimeField = new JTextField("9.5", 10);
         topPanel.add(stopTimeField, gbc);
 
-        // Add button
         gbc.gridx = 3;
         gbc.gridy = 2;
         JButton addButton = new JButton("Add Flow →");
@@ -116,11 +105,10 @@ public class RoutingConfigDialog extends JDialog {
 
         add(topPanel, BorderLayout.NORTH);
 
-        // Center panel - Flow table
         JPanel centerPanel = new JPanel(new BorderLayout());
         centerPanel.setBorder(BorderFactory.createTitledBorder("Configured Flows"));
 
-        String[] columns = {"Source", "Destination", "Type", "Start (s)", "Stop (s)"};
+        String[] columns = { "Source", "Destination", "Type", "Start (s)", "Stop (s)" };
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -145,9 +133,8 @@ public class RoutingConfigDialog extends JDialog {
 
         add(centerPanel, BorderLayout.CENTER);
 
-        // Bottom panel - Action buttons
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        
+
         JButton okButton = new JButton("Apply & Continue");
         okButton.addActionListener(e -> {
             confirmed = true;
@@ -157,7 +144,7 @@ public class RoutingConfigDialog extends JDialog {
         JButton skipButton = new JButton("Skip (Use Default)");
         skipButton.addActionListener(e -> {
             confirmed = true;
-            flows.clear(); // Empty flows = use default first-to-last
+            flows.clear();
             dispose();
         });
 
@@ -172,7 +159,6 @@ public class RoutingConfigDialog extends JDialog {
         bottomPanel.add(cancelButton);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        // Add some default flows as examples
         addDefaultFlows();
 
         setLocationRelativeTo(parent);
@@ -181,14 +167,12 @@ public class RoutingConfigDialog extends JDialog {
     private void addDefaultFlows() {
         List<Node> nodeList = new ArrayList<>(nodes);
         if (nodeList.size() >= 2) {
-            // Add a default flow from first to last node
             flows.add(new TrafficFlow(
-                nodeList.get(0).id,
-                nodeList.get(nodeList.size() - 1).id,
-                "TCP/FTP",
-                0.5,
-                9.5
-            ));
+                    nodeList.get(0).id,
+                    nodeList.get(nodeList.size() - 1).id,
+                    "TCP/FTP",
+                    0.5,
+                    9.5));
             updateTable();
         }
     }
@@ -197,18 +181,18 @@ public class RoutingConfigDialog extends JDialog {
         try {
             int srcIdx = srcNodeCombo.getSelectedIndex();
             int dstIdx = dstNodeCombo.getSelectedIndex();
-            
+
             if (srcIdx < 0 || dstIdx < 0) {
-                JOptionPane.showMessageDialog(this, 
-                    "Please select source and destination nodes", 
-                    "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this,
+                        "Please select source and destination nodes",
+                        "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
             if (srcIdx == dstIdx) {
-                JOptionPane.showMessageDialog(this, 
-                    "Source and destination must be different", 
-                    "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this,
+                        "Source and destination must be different",
+                        "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
@@ -220,9 +204,9 @@ public class RoutingConfigDialog extends JDialog {
             double stopTime = Double.parseDouble(stopTimeField.getText().trim());
 
             if (startTime >= stopTime) {
-                JOptionPane.showMessageDialog(this, 
-                    "Start time must be less than stop time", 
-                    "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this,
+                        "Start time must be less than stop time",
+                        "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
@@ -230,9 +214,9 @@ public class RoutingConfigDialog extends JDialog {
             updateTable();
 
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, 
-                "Invalid time values. Please enter numbers.", 
-                "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                    "Invalid time values. Please enter numbers.",
+                    "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -252,12 +236,12 @@ public class RoutingConfigDialog extends JDialog {
     private void updateTable() {
         tableModel.setRowCount(0);
         for (TrafficFlow flow : flows) {
-            tableModel.addRow(new Object[]{
-                "Node " + flow.srcNodeId,
-                "Node " + flow.dstNodeId,
-                flow.flowType,
-                String.format("%.1f", flow.startTime),
-                String.format("%.1f", flow.stopTime)
+            tableModel.addRow(new Object[] {
+                    "Node " + flow.srcNodeId,
+                    "Node " + flow.dstNodeId,
+                    flow.flowType,
+                    String.format("%.1f", flow.startTime),
+                    String.format("%.1f", flow.stopTime)
             });
         }
     }

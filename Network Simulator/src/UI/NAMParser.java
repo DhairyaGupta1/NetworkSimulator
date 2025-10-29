@@ -3,10 +3,6 @@ package UI;
 import java.io.*;
 import java.util.*;
 
-/**
- * Parser for NAM (Network Animator) files.
- * Extracts nodes, links, and packet events from NAM trace format.
- */
 public class NAMParser {
 
     public static class NAMNode {
@@ -38,7 +34,7 @@ public class NAMParser {
 
     public static class NAMEvent {
         public double time;
-        public String type; // "+" (enqueue), "-" (dequeue), "r" (receive), "d" (drop), "h" (hop)
+        public String type;
         public int srcNode;
         public int dstNode;
         public String packetType;
@@ -77,7 +73,6 @@ public class NAMParser {
 
                 try {
                     if (cmd.equals("n")) {
-                        // Node: n -t time -s node_id -x x -y y -Z size -z color
                         int nodeId = -1;
                         double x = 0, y = 0;
 
@@ -102,7 +97,7 @@ public class NAMParser {
                         }
 
                     } else if (cmd.equals("l")) {
-                        // Link: l -t time -s src -d dst -S state -r rate -D delay
+
                         int src = -1, dst = -1;
 
                         for (int i = 1; i < tokens.length - 1; i++) {
@@ -119,7 +114,6 @@ public class NAMParser {
 
                     } else if (cmd.equals("+") || cmd.equals("-") || cmd.equals("r") ||
                             cmd.equals("d") || cmd.equals("h")) {
-                        // Event: + -t time -s src -d dst -p pkttype -e size -a attr
                         double time = 0;
                         int src = -1, dst = -1;
                         String pktType = "tcp";
@@ -155,12 +149,10 @@ public class NAMParser {
             }
         }
 
-        // Sort events by time - use stable sort with explicit comparator
         data.events.sort((e1, e2) -> {
             int timeCompare = Double.compare(e1.time, e2.time);
             if (timeCompare != 0)
                 return timeCompare;
-            // If times are equal, maintain insertion order by comparing hash codes
             return Integer.compare(System.identityHashCode(e1), System.identityHashCode(e2));
         });
 

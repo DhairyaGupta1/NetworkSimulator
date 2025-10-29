@@ -5,3 +5,10 @@
 *.iml
 out
 *.txt
+
+# Configuration files with sensitive data
+Network Simulator/config.properties
+
+# Compiled class files
+Network Simulator/bin/
+*.class
