@@ -12,3 +12,7 @@ Network Simulator/config.properties
 # Compiled class files
 Network Simulator/bin/
 *.class
+*.docx
+*.pdf
+
+documentation
